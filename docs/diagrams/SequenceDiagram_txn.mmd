@@ -1,0 +1,28 @@
+sequenceDiagram
+    participant App as Application / Client
+    participant DB as PostgreSQL (Health Tables)
+    participant TRG as Trigger (aggregator)
+    participant OUT as Outbox Table
+    participant NOTIFY as LISTEN/NOTIFY
+    participant W as Connector Worker
+    participant FHIR as FHIR Server
+
+    Note over App,DB: Single DB transaction (txid = 0xABC)
+    App->>DB: BEGIN
+    App->>DB: UPDATE patient SET ... WHERE id=1
+    App->>DB: INSERT INTO patient_other_identifiers (...) VALUES (...)
+    App->>DB: UPDATE patient_addresses SET ... WHERE patient_id=1
+    App->>DB: COMMIT
+
+    DB->>TRG: Triggers fire during/after commit <br>(capture txid=0xABC)
+    TRG->>OUT: Insert grouped outbox row <br>(txid=0xABC, patient_id=1, sequence_in_tx=1, <br>payload=grouped_changes)
+    TRG->>NOTIFY: pg_notify(channel, outbox_row_id)
+
+    NOTIFY-->>W: Worker receives notify
+    W->>OUT: Claim grouped outbox row (locked_by, lock_expires_at)
+    W->>OUT: Read grouped payload (all changes in tx)
+    W->>W: Build single FHIR Patient JSON representing transaction
+    W->>FHIR: Conditional PUT /Patient?identifier=system|value
+    FHIR-->>W: 2xx (resourceId + meta.versionId)
+
+    W->>OUT: Update outbox row: <br>processed=true, fhir_resource_id, fhir_version, processed_at

@@ -1,0 +1,23 @@
+sequenceDiagram
+    participant W as Connector Worker
+    participant OUT as Outbox Table
+    participant FHIR as FHIR Server
+    participant DLQ as Dead Letter Queue
+    participant OPS as Monitoring/Alerting
+
+    W->>OUT: Claim unprocessed row (locked_by=worker, lock_expires_at)
+    W->>OUT: Read payload (Patient data)
+    W->>FHIR: Conditional PUT /Patient?identifier=system|value
+
+    alt Success (2xx)
+        FHIR-->>W: 200 OK (resourceId + versionId)
+        W->>OUT: Mark processed=true, store fhir_resource_id & versionId
+    else Transient Error (e.g. 500, network)
+        FHIR-->>W: 5xx error
+        W->>OUT: Increment attempts, release lock, schedule retry (exponential backoff)
+    else Non-Retryable Error (e.g. 400 conflict, invalid data)
+        FHIR-->>W: 4xx error
+        W->>DLQ: Insert row into DLQ (payload, error, attempts)
+        W->>OUT: Mark original row failed/archived
+        DLQ-->>OPS: Raise alert (DLQ growth, high error rate)
+    end
