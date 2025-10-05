@@ -42,7 +42,7 @@ CREATE TABLE patient_other_identifiers (
     id SERIAL PRIMARY KEY,
     patient_id INTEGER NOT NULL REFERENCES patient(id),
     identifier_system TEXT,
-    identifier_value TEXT,
+    identifier_value TEXT
 );
 
 -- Clinical encounters/visits
