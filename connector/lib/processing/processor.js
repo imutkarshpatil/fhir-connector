@@ -1,14 +1,20 @@
 'use strict';
 
 // Import required modules
-const { getSequelize, getModels, Sequelize } = require('../db');
+const { getSequelize, getModels, Sequelize, ensureInitialized } = require('../db');
 const config = require('../config');
 const mapper = require('../fhir/mapper');
 const fhirClient = require('../fhir/client');
 const metrics = require('../metrics/metrics');
 const logger = require('../logger');
 
-// Initialize Sequelize and models
+// Ensure DB is initialized
+ensureInitialized().catch(err => {
+  logger.error('Database initialization error', err);
+  process.exit(1);
+});
+
+// Get Sequelize instance and models
 const sequelize = () => getSequelize();
 const { Outbox, Dlq, ProcessedEvent } = getModels();
 
