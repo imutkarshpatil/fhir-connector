@@ -1,0 +1,14 @@
+services:
+  connector:
+    # Override the default container command to run in dev mode
+    command: sh -c "npm install && npm run dev"
+    environment:
+      NODE_ENV: development
+    volumes:
+      # Mount the source for live code editing
+      - ./connector:/app
+      # Ensure node_modules inside container remains isolated
+      - /app/node_modules
+    # Optional: forward logs interactively
+    stdin_open: true
+    tty: true

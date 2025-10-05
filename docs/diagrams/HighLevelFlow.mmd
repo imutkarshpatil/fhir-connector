@@ -1,0 +1,25 @@
+flowchart LR
+ subgraph DB["PostgreSQL (Health Tables)"]
+    direction TB
+        P["patient, patient_other_identifiers"]
+        OUT["outbox table"]
+        DLQ["fhir_dlq table"]
+  end
+ subgraph Connector["FHIR Connector(Stateless Workers)"]
+    direction TB
+        LISTEN["LISTEN / NOTIFY Listener"]
+        WORKER["Workers<br>- Claim outbox rows<br>- Build FHIR JSON<br>- Call FHIR API<br>- Mark processed / DLQ"]
+  end
+ subgraph FHIR["FHIR Server"]
+    direction TB
+        API[("FHIR REST API")]
+        STORE[("FHIR Resource Store<br>Patient + Versions")]
+  end
+    LISTEN --> WORKER
+    API --> STORE
+    P -- triggers --> OUT
+    OUT -- notify --> LISTEN
+    WORKER --> API & OUT & DLQ
+
+
+

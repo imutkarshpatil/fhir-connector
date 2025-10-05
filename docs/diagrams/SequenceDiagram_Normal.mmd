@@ -1,0 +1,23 @@
+sequenceDiagram
+    participant App as Application (writes patient)
+    participant DB as PostgreSQL (Health Tables)
+    participant TRG as Trigger (Outbox writer)
+    participant OUT as Outbox Table
+    participant NOTIFY as LISTEN/NOTIFY
+    participant W as Connector Worker
+    participant FHIR as FHIR Server
+
+    App->>DB: INSERT/UPDATE/DELETE on patient / identifiers
+    DB->>TRG: Trigger fired after row change
+    TRG->>OUT: Insert outbox row (txid, record_id, op, payload, processed=false)
+    TRG->>NOTIFY: pg_notify(channel, outbox_row_id)
+
+    NOTIFY-->>W: Worker receives notification
+    W->>OUT: Claim row (locked_by=worker, lock_expires_at)
+    W->>OUT: Read payload (patient_id, identifiers, demographics)
+    W->>W: Build FHIR Patient JSON
+    W->>FHIR: Conditional PUT /Patient?identifier=system|value
+    FHIR-->>W: 2xx response (resourceId + meta.versionId)
+
+    W->>OUT: Mark row processed=true, store fhir_resource_id + versionId
+    OUT-->>DB: Outbox row finalized (processed_at=now)

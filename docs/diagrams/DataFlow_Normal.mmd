@@ -1,0 +1,29 @@
+flowchart LR
+  subgraph DB["PostgreSQL (Health Tables)"]
+    direction TB
+    T[patient / patient_other_identifiers table]
+    TRG["Trigger(writes outbox row with txid, payload, sequence_in_tx)"]
+    OUT[outbox table<br>id, txid, record_id, op, payload_json, created_at, processed=false]
+    NOTF[pg_notify / LISTEN channel]
+    T --> TRG --> OUT --> NOTF
+  end
+
+  subgraph Connector["Connector (stateless worker)"]
+    direction TB
+    L[LISTEN -> receives notification]
+    C["Claim outbox row<br>(UPDATE locked_by, lock_expires_at)"]
+    B[Build FHIR Patient JSON from payload]
+    API["Conditional PUT /Patient?identifier=system|value<br/>or PUT /Patient/{id}"]
+    S[Store fhir_resource_id & fhir_version, mark processed=true]
+    L --> C --> B --> API --> S
+  end
+
+  subgraph FHIR["FHIR Server"]
+    direction TB
+    FHIR_API[(FHIR API)]
+    FHIR_DB[(FHIR store: resource id + meta.versionId)]
+    API --> FHIR_API --> FHIR_DB
+  end
+
+NOTF --> L
+S --> OUT

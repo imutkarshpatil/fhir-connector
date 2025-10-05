@@ -1,0 +1,21 @@
+flowchart LR
+  subgraph DB_TX["Single DB Transaction (txid = 0xABC)"]
+    direction TB
+    A[UPDATE patient SET ...] 
+    B[INSERT patient_other_identifiers ...]
+    C[UPDATE some other patient-related table ...]
+    TRG["Trigger (aggregate per patient_key)"]
+    OUT_GROUP[outbox row for txid=0xABC, patient_id=1, sequence_in_tx=1, payload=grouped_changes]
+  end
+
+  subgraph Connector["Connector"]
+    direction TB
+    LISTEN[LISTEN -> notify]
+    CLAIM[Claim grouped outbox row]
+    BUILD[Build single FHIR Patient payload representing transaction]
+    CALL[PUT /Patient?identifier=...]
+    STORE[Store fhir_resource_id+version, mark processed]
+  end
+
+  A & B & C --> TRG --> OUT_GROUP
+  OUT_GROUP -->|NOTIFY| LISTEN --> CLAIM --> BUILD --> CALL --> STORE

@@ -1,0 +1,28 @@
+flowchart TB
+  subgraph Connector["Connector (worker)"]
+    direction TB
+    1["Claim outbox row <br>(locked_by, lock_expires_at)"]
+    2["Attempt FHIR call<br>(conditional PUT /Patient...)"]
+    3a[Success: <br>record fhir_resource_id + meta.versionId; <br>mark processed=true]
+    3b["Transient error <br>(5xx / network)"]
+    3c["Non-retryable error <br>(4xx conflict / malformed)"]
+    4[Increment attempts; <br>release lock & schedule <br>retry with backoff]
+    5[Attempts > threshold ? <br>-> move to DLQ]
+  end
+
+  subgraph DB["PostgreSQL"]
+    direction TB
+    OUT[outbox row]
+    DLQ[dlq table<br/>outbox_id, original_payload, <br>last_error, attempts, <br>first_failed_at]
+  end
+
+  subgraph Ops["Operations"]
+    direction TB
+    ALERT[Alert: <br>DLQ growth / high retry rate]
+  end
+
+  OUT --> 1 --> 2
+  2 -- 2xx --> 3a --> OUT
+  2 -- transient --> 3b --> 4 --> OUT
+  2 -- non-retryable --> 3c --> 5 --> DLQ
+  DLQ --> ALERT
