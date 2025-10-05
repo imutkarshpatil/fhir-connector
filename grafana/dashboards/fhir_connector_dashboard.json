@@ -27,7 +27,7 @@
       "gridPos": {"x":6,"y":0,"w":6,"h":3},
       "targets": [
         {
-          "expr": "gauge(fhir_outbox_unprocessed_count) or fhir_outbox_unprocessed_count",
+          "expr": "fhir_outbox_unprocessed_count",
           "refId": "A"
         }
       ],
@@ -40,7 +40,7 @@
       "gridPos": {"x":12,"y":0,"w":6,"h":3},
       "targets": [
         {
-          "expr": "gauge(fhir_outbox_lag_seconds) or fhir_outbox_lag_seconds",
+          "expr": "fhir_outbox_lag_seconds",
           "refId": "A"
         }
       ],
@@ -53,7 +53,7 @@
       "gridPos": {"x":18,"y":0,"w":6,"h":3},
       "targets": [
         {
-          "expr": "gauge(fhir_dlq_total) or fhir_dlq_total",
+          "expr": "fhir_dlq_total",
           "refId": "A"
         }
       ],
