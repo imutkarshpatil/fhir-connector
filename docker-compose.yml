@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: fhir_pg
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-health_tables}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d
+
+  connector:
+    build:
+      context: ./connector
+      dockerfile: Dockerfile
+    volumes:
+      - ./:/app:delegated
+      - /app/node_modules   # anonymous volume so container owns node_modules
+    container_name: fhir_connector
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+    ports:
+      - "9464:9464" # Prometheus metrics endpoint (dev)
+    # If you want to run the connector in foreground to see logs locally, use:
+    # command: ["node", "index.js"]
+
+  # Optional local HAPI FHIR server for local testing (commented by default)
+  # hapi-fhir:
+  #   image: hapiproject/hapi:latest
+  #   container_name: hapi_fhir
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     HAPI_FHIR_EMBEDDED_DATABASE: "true"
