@@ -37,13 +37,13 @@ async function initSequelize() {
 
       // Test connection
       await sequelize.authenticate();
-      logger.info('[db] Sequelize connected');
+      logger.info(`[db] Sequelize connected to ${config.DB_HOST}:${config.DB_PORT} as ${config.DB_USER}`);
 
       return { sequelize, models };
     } catch (err) {
       // Reset initPromise so a retry can be attempted by caller
       initPromise = null;
-      logger.error('[db] initSequelize failed', err);
+      logger.error(`[db] initSequelize failed for ${config.DB_HOST}:${config.DB_PORT} as ${config.DB_USER}`, err);
       throw err;
     }
   })();

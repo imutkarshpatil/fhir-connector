@@ -29,13 +29,13 @@ async function start(onNotification) {
         onNotification(msg.payload);
       }
     } catch (err) {
-      logger.error('[pgNotify] notification handler error', err);
+      logger.error(`[pgNotify] notification handler error: ${err}, payload: ${msg.payload}`);
     }
   });
 
   // Handle client errors
   client.on('error', (err) => {
-    logger.error('[pgNotify] client error', err);
+    logger.error(`[pgNotify] client error: ${err}`);
   });
 
   // Connect to the database and start listening on the configured channel
@@ -54,7 +54,7 @@ async function stop() {
       client = null;
     }
   } catch (err) {
-    logger.error('[pgNotify] stop error', err);
+    logger.error(`[pgNotify] stop error: ${err}`);
   }
 }
 

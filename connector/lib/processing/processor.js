@@ -10,7 +10,7 @@ const logger = require('../logger');
 
 // Ensure DB is initialized
 ensureInitialized().catch(err => {
-  logger.error('Database initialization error', err);
+  logger.error(`Database initialization error: ${err}`);
   process.exit(1);
 });
 
@@ -99,15 +99,15 @@ async function claimGroup(txid, patientId) {
     [Sequelize.Op.and]: [
       {
         // ready-to-retry condition
-    [Sequelize.Op.or]: [
-      { next_retry_at: null },
+        [Sequelize.Op.or]: [
+          { next_retry_at: null },
           { next_retry_at: { [Sequelize.Op.lte]: nowFn } }
         ]
       },
       {
         // available-to-lock condition
-    [Sequelize.Op.or]: [
-      { locked_by: null },
+        [Sequelize.Op.or]: [
+          { locked_by: null },
           { lock_expires_at: { [Sequelize.Op.lte]: nowFn } }
         ]
       }
@@ -120,7 +120,7 @@ async function claimGroup(txid, patientId) {
 
   // values to set when claiming
   const updateValues = {
-      locked_by: config.WORKER_ID,
+    locked_by: config.WORKER_ID,
     // keep using literal if your codebase expects string SQL here
     lock_expires_at: sequelize().literal("now() + interval '30 seconds'")
   };
@@ -180,6 +180,7 @@ async function markProcessed(ids, fhirId, fhirVersion) {
       where: { id: ids }
     }
   );
+  logger.info(`Marked processed: ids=${JSON.stringify(ids)}, fhirId=${fhirId}, fhirVersion=${fhirVersion}`);
 }
 
 /**
@@ -199,6 +200,7 @@ async function markRetry(id, errText) {
     lock_expires_at: null
   });
   metrics.failedTotal.inc();
+  logger.warn(`Marked for retry: id=${id}, error=${errText}`);
 }
 
 /**
@@ -220,6 +222,7 @@ async function moveToDLQ(id, errText) {
   // Remove from Outbox
   await row.destroy();
   metrics.failedTotal.inc();
+  logger.error(`Moved to DLQ: id=${id}, error=${errText}`);
 }
 
 /**
@@ -239,6 +242,7 @@ async function processClaimed() {
   const groupRows = await claimGroup(txid, patientId);
   if (!groupRows || groupRows.length === 0) {
     await markRetry(claimed.id, 'Empty group after claim');
+    logger.warn(`Empty group after claim: txid=${txid}, patientId=${patientId}`);
     return false;
   }
 
@@ -260,7 +264,7 @@ async function processClaimed() {
   } else {
     // No identifier available, move all group rows to DLQ
     const err = 'No identifier available for conditional update';
-    logger.warn('[processor] ' + err);
+    logger.warn(`[processor] ${err}, txid=${txid}, patientId=${patientId}`);
     for (const row of groupRows) await moveToDLQ(row.id, err);
     return true;
   }
@@ -286,20 +290,20 @@ async function processClaimed() {
     await ProcessedEvent.create({ event_key: eventKey, processed_at: new Date() });
 
     metrics.processedTotal.inc(ids.length);
-    logger.info('[processor] processed', { txid, count: ids.length, fhirId, fhirVersion });
+    logger.info(`[processor] processed: txid=${txid}, count=${ids.length}, fhirId=${fhirId}, fhirVersion=${fhirVersion}`);
     return true;
   } catch (err) {
     // Handle FHIR errors: retry or move to DLQ
     const status = err.response ? err.response.status : null;
     const errText = err.response && err.response.data ? JSON.stringify(err.response.data) : (err.message || 'unknown error');
-    logger.error('[processor] FHIR error', { status, errText });
+    logger.error(`[processor] FHIR error: status=${status}, error=${errText}, txid=${txid}, patientId=${patientId}`);
 
     if (isRetryableStatus(status)) {
       for (const row of groupRows) await markRetry(row.id, errText);
-      logger.warn('[processor] scheduled retry', { txid });
+      logger.warn(`[processor] scheduled retry: txid=${txid}, patientId=${patientId}`);
     } else {
       for (const row of groupRows) await moveToDLQ(row.id, errText);
-      logger.error('[processor] moved to DLQ', { txid, errText });
+      logger.error(`[processor] moved to DLQ: txid=${txid}, error=${errText}, patientId=${patientId}`);
     }
     return false;
   }
@@ -312,12 +316,16 @@ async function processClaimed() {
 async function pollLoop() {
   try {
     const processed = await processClaimed();
-    if (!processed) await sleep(500);
+    if (!processed) {
+      logger.info('No outbox processed, sleeping 500ms');
+      await sleep(500);
+    }
   } catch (err) {
-    logger.error('[processor] pollLoop error', err);
+    logger.error(`[processor] pollLoop error: ${err}`);
     await sleep(1000);
   }
 }
 
 // Export main functions
 module.exports = { processClaimed, pollLoop };
+

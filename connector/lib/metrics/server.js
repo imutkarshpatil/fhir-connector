@@ -13,7 +13,7 @@ const POLL_SECONDS = parseInt(process.env.METRICS_POLL_SECONDS || '10', 10);
 
 // Ensure DB is initialized before starting metrics server
 ensureInitialized().catch(err => {
-  logger.error('[metrics] Failed to initialize DB for metrics', err);
+  logger.error(`[metrics] Failed to initialize DB for metrics: ${err}`);
   process.exit(1);
 });
 
@@ -55,14 +55,14 @@ async function updateDbDerivedMetrics() {
     }
     metrics.outboxLagSeconds.set(Number(lag));
     metrics.outboxUnprocessedCount.set(count);
-    logger.debug('[metrics] updated outbox metrics', { lag, count });
+    logger.debug(`[metrics] updated outbox metrics lag=${lag} count=${count}`);
 
     // Get DLQ size
     const dlqCount = await Dlq.count();
     metrics.dlqSize.set(dlqCount);
 
   } catch (err) {
-    logger.error('[metrics] updateDbDerivedMetrics error', err);
+    logger.error(`[metrics] updateDbDerivedMetrics error: ${err}`);
   }
 }
 

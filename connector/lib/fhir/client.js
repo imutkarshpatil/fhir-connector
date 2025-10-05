@@ -40,11 +40,7 @@ async function conditionalPutPatient(system, value, body) {
     metrics.fhirCallLatency.observe(elapsed);
     metrics.fhirCallErrors.inc();
     // Log error details
-    logger.error('[fhirClient] conditionalPut error', {
-      url,
-      err: err.message,
-      status: err.response && err.response.status
-    });
+    logger.error(`[fhirClient] putById error url=${url} err=${err.message} status=${err.response && err.response.status}`);
     throw err;
   }
 }
@@ -76,11 +72,7 @@ async function putPatientById(id, body, ifMatch) {
     metrics.fhirCallLatency.observe(elapsed);
     metrics.fhirCallErrors.inc();
     // Log error details
-    logger.error('[fhirClient] putById error', {
-      url,
-      err: err.message,
-      status: err.response && err.response.status
-    });
+    logger.error(`[fhirClient] putById error url=${url} err=${err.message} status=${err.response && err.response.status}`);
     throw err;
   }
 }
