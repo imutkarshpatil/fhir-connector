@@ -2,6 +2,8 @@
 
 The **FHIR Connector** is a stateless Node.js worker that listens for database change notifications from PostgreSQL and pushes synchronized updates to a FHIR server.
 
+It forms the core of the **Health Tables → FHIR synchronization pipeline** and integrates with **Prometheus** and **Grafana** for observability.
+
 ---
 
 ## 🧩 Overview
@@ -17,7 +19,7 @@ The **FHIR Connector** is a stateless Node.js worker that listens for database c
 ````
 
 **Latency goal:** < 1 second from DB commit to FHIR update
-**Delivery semantics:** at-least-once (idempotent PUTs prevent duplicates)
+**Delivery semantics:** *at-least-once* (idempotent PUTs prevent duplicates)
 
 ---
 
@@ -45,14 +47,16 @@ The **FHIR Connector** is a stateless Node.js worker that listens for database c
 | `fhir_connector_processed_total` | Counter   | Number of successfully processed rows          |
 | `fhir_connector_failed_total`    | Counter   | Number of failed rows (transient or permanent) |
 | `fhir_dlq_total`                 | Gauge     | DLQ size                                       |
-| `fhir_call_latency_seconds`      | Histogram | FHIR call duration distribution                |
+| `fhir_call_latency_seconds`      | Histogram | FHIR call duration distribution (p50/p90/p99)  |
 | `fhir_call_errors_total`         | Counter   | Count of FHIR API failures                     |
+
+Metrics are exported via `prom-client` and scraped every 5 seconds by Prometheus.
 
 ---
 
 ## 🧭 Prometheus Endpoint
 
-The connector exposes metrics via an embedded Express server:
+The connector exposes metrics via an embedded HTTP server:
 
 ```
 GET /metrics → text/plain; version=0.0.4
@@ -61,20 +65,23 @@ GET /metrics → text/plain; version=0.0.4
 Default port: `9464`
 Change with `METRICS_PORT` in `.env`.
 
-Prometheus scrape config example:
+Prometheus scrape config (from root `prometheus.yml`):
 
 ```yaml
 scrape_configs:
   - job_name: fhir_connector
     static_configs:
-      - targets: ['localhost:9464']
+      - targets: ['connector:9464']
 ```
+
+Grafana automatically provisions a dashboard from
+`grafana/dashboards/fhir_connector_dashboard.json` when using the provided Docker setup.
 
 ---
 
 ## 🧱 Local Development
 
-### Start in hot-reload mode
+### 1️⃣ Start in hot-reload mode (Docker)
 
 ```bash
 docker compose up
@@ -88,7 +95,9 @@ npm install && npm run dev
 
 (`nodemon` watches for changes and restarts automatically.)
 
-### Run standalone (without Docker)
+The startup is guarded by `wait-for-postgres.sh` — it waits until the Postgres service is reachable before starting Node.js.
+
+### 2️⃣ Run standalone (without Docker)
 
 ```bash
 cd connector
@@ -101,7 +110,7 @@ npm run start
 
 ## 🧩 Logging
 
-Structured JSON logs emitted via Pino. Example:
+Structured JSON logs emitted via **Pino**:
 
 ```json
 {
@@ -137,27 +146,30 @@ Set with `LOG_LEVEL=debug` in `.env`.
 
 ## 🧪 Testing and Verification
 
-Run the built-in test script:
+Run the built-in test script (from repo root):
 
 ```bash
-docker exec -it fhir_pg psql -U postgres -d health_tables -f /docker-entrypoint-initdb.d/test_events.sql
+docker exec -it fhir_pg psql -U postgres -d postgres -f /docker-entrypoint-initdb.d/test_events.sql
 ```
 
 Verify:
 
 * Outbox rows created.
 * Connector logs show FHIR PUT calls.
-* Metrics counters increase.
+* Prometheus metrics counters increase.
+* Grafana dashboard updates live.
 
 ---
 
 ## 🧱 Deployment Notes
 
-* **Stateless**: scale horizontally (multiple connector containers can run safely due to row-level locking).
-* **Config via ENV**: all parameters injected from `.env` or Docker environment.
-* **Docker-ready**: minimal Alpine image (~120 MB).
-* **Prometheus endpoint**: `/metrics` (port `9464`).
-* **Logging**: JSON, compatible with Loki, Datadog, etc.
+* **Stateless:** Scale horizontally (multiple workers safely claim rows due to row-level locks).
+* **Config via ENV:** Injected via `.env` or Docker environment.
+* **Docker-ready:** Lightweight Alpine image (~120 MB).
+* **Wait-for-Postgres:** Prevents startup race with DB initialization.
+* **Prometheus endpoint:** `/metrics` (port `9464`).
+* **Grafana-ready:** Dashboards auto-provisioned and persisted in `grafana_data` volume.
+* **Logging:** JSON (compatible with Loki, Datadog, etc.).
 
 ---
 
@@ -169,7 +181,7 @@ Verify:
 | `DB_PORT`              | Postgres port                | `5432`                                      |
 | `DB_USER`              | Postgres user                | `postgres`                                  |
 | `DB_PASSWORD`          | DB password                  | `postgres`                                  |
-| `DB_NAME`              | Database name                | `health_tables`                             |
+| `DB_NAME`              | Database name                | `postgres`                                  |
 | `DB_CHANNEL`           | NOTIFY channel               | `fhir_outbox_event`                         |
 | `FHIR_SERVER`          | FHIR server base URL         | `https://fhir-bootcamp.medblocks.com/fhir/` |
 | `WORKER_ID`            | Unique worker name           | auto-generated                              |
@@ -182,11 +194,21 @@ Verify:
 
 ## 🧠 Extensibility Roadmap
 
-* Add **OpenTelemetry tracing** for FHIR calls and DB operations.
+* Add **OpenTelemetry tracing** for FHIR and DB operations.
 * Support **Observation** and **Encounter** resource mappings.
-* Introduce **graceful shutdown hooks** for Kubernetes readiness.
-* Add **Grafana dashboard** using provided metrics.
+* Introduce **graceful shutdown hooks** for Kubernetes readiness probes.
+* Extend **Grafana dashboards** with latency and DLQ drill-downs.
 
 ---
 
-MIT © 2025
+## 🔗 See Also
+
+Refer to the **[Root README](../README.md)** for:
+
+* Docker Compose setup (Postgres + Connector + Prometheus + Grafana)
+* Grafana provisioning details
+* Troubleshooting common issues
+
+---
+
+MIT © 2025 — [Utkarsh Patil](https://github.com/imutkarshpatil)
