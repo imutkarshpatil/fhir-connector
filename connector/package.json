@@ -4,7 +4,7 @@
   "description": "Health Tables -> FHIR connector worker (modular)",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
+    "start": "nodemon index.js",
     "dev": "NODE_ENV=development nodemon index.js"
   },
   "dependencies": {
