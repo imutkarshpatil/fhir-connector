@@ -1,0 +1,165 @@
+{
+  "id": null,
+  "uid": "fhir-connector-metrics",
+  "title": "FHIR Connector — Metrics Overview",
+  "timezone": "browser",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Connector Up",
+      "gridPos": {"x":0,"y":0,"w":6,"h":3},
+      "targets": [
+        {
+          "expr": "up{job=\"fhir_connector\"}",
+          "refId": "A"
+        }
+      ],
+      "options": {"reduceOptions":{"calcs":["lastNotNull"],"fields":""}}
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Unprocessed Outbox (count)",
+      "gridPos": {"x":6,"y":0,"w":6,"h":3},
+      "targets": [
+        {
+          "expr": "gauge(fhir_outbox_unprocessed_count) or fhir_outbox_unprocessed_count",
+          "refId": "A"
+        }
+      ],
+      "options": {"colorMode":"value","reduceOptions":{"calcs":["lastNotNull"]}}
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Outbox Lag (oldest event, sec)",
+      "gridPos": {"x":12,"y":0,"w":6,"h":3},
+      "targets": [
+        {
+          "expr": "gauge(fhir_outbox_lag_seconds) or fhir_outbox_lag_seconds",
+          "refId": "A"
+        }
+      ],
+      "options": {"reduceOptions":{"calcs":["lastNotNull"]}}
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "DLQ Size",
+      "gridPos": {"x":18,"y":0,"w":6,"h":3},
+      "targets": [
+        {
+          "expr": "gauge(fhir_dlq_total) or fhir_dlq_total",
+          "refId": "A"
+        }
+      ],
+      "options": {"reduceOptions":{"calcs":["lastNotNull"]}}
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Processed / Failed (rate per min)",
+      "gridPos": {"x":0,"y":3,"w":12,"h":7},
+      "targets": [
+        {
+          "expr": "rate(fhir_connector_processed_total[1m])",
+          "legendFormat": "processed",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(fhir_connector_failed_total[1m])",
+          "legendFormat": "failed",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {"defaults":{"unit":"ops"}}
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "FHIR Call Latency (p50/p90/p99, seconds)",
+      "gridPos": {"x":12,"y":3,"w":12,"h":7},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum(rate(fhir_call_latency_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.9, sum(rate(fhir_call_latency_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p90",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(fhir_call_latency_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {"defaults":{"unit":"s"}}
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "FHIR Call Errors (rate)",
+      "gridPos": {"x":0,"y":10,"w":12,"h":6},
+      "targets": [
+        {
+          "expr": "rate(fhir_call_errors_total[1m])",
+          "legendFormat": "errors",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {"defaults":{"unit":"ops"}}
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Recent Outbox / DLQ Counts",
+      "gridPos": {"x":12,"y":10,"w":12,"h":6},
+      "targets": [
+        {
+          "expr": "fhir_outbox_unprocessed_count",
+          "refId": "A"
+        },
+        {
+          "expr": "fhir_dlq_total",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Outbox Processed (total)",
+      "gridPos": {"x":0,"y":16,"w":12,"h":6},
+      "targets": [
+        {
+          "expr": "increase(fhir_connector_processed_total[5m])",
+          "legendFormat": "processed (+5m)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {"defaults":{"unit":"ops"}}
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Outbox Unprocessed Count (trend)",
+      "gridPos": {"x":12,"y":16,"w":12,"h":6},
+      "targets": [
+        {
+          "expr": "fhir_outbox_unprocessed_count",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "templating": {"list":[]},
+  "annotations": {"list":[]},
+  "time": {"from":"now-1h","to":"now"}
+}
