@@ -276,7 +276,7 @@ BEGIN
   END IF;
 
   BEGIN
-    v_patient_id := (v_payload ->> 'patient_id')::int;
+    v_patient_id := (v_payload ->> 'id')::int;
   EXCEPTION WHEN others THEN
     v_patient_id := NULL;
   END;
