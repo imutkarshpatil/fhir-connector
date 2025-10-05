@@ -91,39 +91,71 @@ async function claimOneOutbox() {
  * @returns {Promise<Array>}
  */
 async function claimGroup(txid, patientId) {
-  const where = {
+  // Build a correct eligibility where (no duplicate keys)
+  const nowFn = sequelize().fn('now');
+  const eligibleWhere = {
     processed: false,
     txid,
+    [Sequelize.Op.and]: [
+      {
+        // ready-to-retry condition
     [Sequelize.Op.or]: [
       { next_retry_at: null },
-      { next_retry_at: { [Sequelize.Op.lte]: sequelize().fn('now') } }
-    ],
+          { next_retry_at: { [Sequelize.Op.lte]: nowFn } }
+        ]
+      },
+      {
+        // available-to-lock condition
     [Sequelize.Op.or]: [
       { locked_by: null },
-      { lock_expires_at: { [Sequelize.Op.lte]: sequelize().fn('now') } }
+          { lock_expires_at: { [Sequelize.Op.lte]: nowFn } }
+        ]
+      }
     ]
   };
-  if (patientId === null) {
-    where.patient_id = null;
-  } else {
-    where.patient_id = patientId;
+
+  // add patient id filter
+  if (patientId === null) eligibleWhere.patient_id = null;
+  else eligibleWhere.patient_id = patientId;
+
+  // values to set when claiming
+  const updateValues = {
+      locked_by: config.WORKER_ID,
+    // keep using literal if your codebase expects string SQL here
+    lock_expires_at: sequelize().literal("now() + interval '30 seconds'")
+  };
+
+  // Try atomic UPDATE ... RETURNING (Postgres + Sequelize support)
+  try {
+    const [affectedCount, updatedRows] = await Outbox.update(updateValues, {
+      where: eligibleWhere,
+      returning: true // Postgres: returns the updated rows
+    });
+
+    if (Array.isArray(updatedRows) && updatedRows.length > 0) {
+      return updatedRows.map(r => r.get({ plain: true }));
+    }
+    // If returning empty, fallthrough to fallback refetch
+  } catch (err) {
+    // Some Sequelize configs or dialects may not support returning; we'll fall back
+    // (don't throw — we still try the safe refetch)
+    logger.error(`claimGroup error: ${err}, txid: ${txid}, patientId: ${patientId}`);
   }
 
-  // Find all group rows
-  const groupRows = await Outbox.findAll({ where });
+  // Fallback: refetch rows that were actually claimed by this worker.
+  // IMPORTANT: this where does NOT reuse the old 'eligibleWhere' (which contained
+  // a locked_by:null OR clause). We build a clean filter that looks for rows
+  // locked_by our worker (AND processed=false, same txid/patient).
+  const claimedWhere = {
+    processed: false,
+    txid,
+    locked_by: config.WORKER_ID
+  };
+  if (patientId === null) claimedWhere.patient_id = null;
+  else claimedWhere.patient_id = patientId;
 
-  // Claim all group rows
-  await Outbox.update(
-    {
-      locked_by: config.WORKER_ID,
-      lock_expires_at: sequelize().literal("now() + interval '30 seconds'")
-    },
-    { where }
-  );
-
-  // Refetch claimed rows
-  const claimedRows = await Outbox.findAll({ where: { ...where, locked_by: config.WORKER_ID } });
-  return claimedRows.map(row => row.get({ plain: true }));
+  const claimedRows = await Outbox.findAll({ where: claimedWhere });
+  return claimedRows.map(r => r.get({ plain: true }));
 }
 
 /**
