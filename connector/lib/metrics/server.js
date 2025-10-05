@@ -5,13 +5,19 @@ const express = require('express');
 const metrics = require('../metrics/metrics');
 const logger = require('../logger');
 const config = require('../config');
-const { getSequelize, getModels } = require('../db');
+const { getSequelize, getModels, ensureInitialized, Sequelize } = require('../db');
 
 // Metrics server configuration
 const METRICS_PORT = parseInt(process.env.METRICS_PORT || '9464', 10);
 const POLL_SECONDS = parseInt(process.env.METRICS_POLL_SECONDS || '10', 10);
 
-// ORM Models
+// Ensure DB is initialized before starting metrics server
+ensureInitialized().catch(err => {
+  logger.error('[metrics] Failed to initialize DB for metrics', err);
+  process.exit(1);
+});
+
+// Get ORM models
 const { Outbox, Dlq } = getModels();
 
 /**
@@ -26,9 +32,9 @@ async function updateDbDerivedMetrics() {
     const outboxRows = await Outbox.findAll({
       where: {
         processed: false,
-        [sequelize.Op.or]: [
+        [Sequelize.Op.or]: [
           { next_retry_at: null },
-          { next_retry_at: { [sequelize.Op.lte]: new Date() } }
+          { next_retry_at: { [Sequelize.Op.lte]: new Date() } }
         ]
       },
       attributes: [
