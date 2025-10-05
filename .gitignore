@@ -13,3 +13,9 @@ build/
 
 # VSCode
 .vscode/
+
+# Prometheus
+prometheus-data/
+
+# Grafana
+grafana-data/
