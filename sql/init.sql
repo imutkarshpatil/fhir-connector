@@ -10,7 +10,7 @@
 -- Compatible with PostgreSQL 16
 
 -- Patient demographics and basic information
-CREATE TABLE patient (
+CREATE TABLE IF NOT EXISTS patient (
     id SERIAL PRIMARY KEY,
     active BOOLEAN NOT NULL DEFAULT true,
     birth_date DATE,
@@ -45,7 +45,7 @@ CREATE TABLE patient (
 );
 
 -- patient's other identifiers
-CREATE TABLE patient_other_identifiers (
+CREATE TABLE IF NOT EXISTS patient_other_identifiers (
     id SERIAL PRIMARY KEY,
     patient_id INTEGER NOT NULL REFERENCES patient(id),
     identifier_system TEXT,
@@ -53,7 +53,7 @@ CREATE TABLE patient_other_identifiers (
 );
 
 -- Clinical encounters/visits
-CREATE TABLE form (
+CREATE TABLE IF NOT EXISTS form (
     id SERIAL PRIMARY KEY,
     patient_id INTEGER NOT NULL REFERENCES patient(id),
     name TEXT,
@@ -63,7 +63,7 @@ CREATE TABLE form (
 );
 
 -- Blood pressure measurements
-CREATE TABLE blood_pressure (
+CREATE TABLE IF NOT EXISTS blood_pressure (
     id SERIAL PRIMARY KEY,
     form_id INTEGER REFERENCES form(id),
     patient_id INTEGER NOT NULL REFERENCES patient(id),
@@ -78,7 +78,7 @@ CREATE TABLE blood_pressure (
 );
 
 -- Pulse/heart rate measurements  
-CREATE TABLE pulse (
+CREATE TABLE IF NOT EXISTS pulse (
     id SERIAL PRIMARY KEY,
     form_id INTEGER REFERENCES form(id),
     patient_id INTEGER NOT NULL REFERENCES patient(id),
