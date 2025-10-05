@@ -1,48 +1,58 @@
 // connector/lib/db/index.js
 'use strict';
 
-// Import required modules
 const { Sequelize } = require('sequelize');
 const config = require('../config');
 const logger = require('../logger');
 const { defineModels } = require('./models');
 
-// Sequelize instance and models container
-let sequelize;
+let sequelize = null;
 let models = {};
+let initPromise = null;
 
 /**
- * Initializes Sequelize connection and defines models.
- * @returns {Promise<{sequelize: Sequelize, models: Object}>}
+ * Initialize Sequelize connection and define models.
+ * Safe to call multiple times; returns same promise if initialization in progress.
  */
 async function initSequelize() {
-  // Create Sequelize instance with configuration
-  sequelize = new Sequelize(
-    config.DB_NAME,
-    config.DB_USER,
-    config.DB_PASSWORD,
-    {
-      host: config.DB_HOST,
-      port: config.DB_PORT,
-      dialect: 'postgres',
-      logging: false, // Disable SQL query logging
-      pool: { max: 5, min: 0, idle: 10000 } // Connection pool settings
+  if (initPromise) return initPromise;
+
+  initPromise = (async () => {
+    try {
+      sequelize = new Sequelize(
+        config.DB_NAME,
+        config.DB_USER,
+        config.DB_PASSWORD,
+        {
+          host: config.DB_HOST,
+          port: config.DB_PORT,
+          dialect: 'postgres',
+          logging: false,
+          pool: { max: 5, min: 0, idle: 10000 }
+        }
+      );
+
+      // Define models now (keeps definitions close to the instance)
+      models = defineModels(sequelize);
+
+      // Test connection
+      await sequelize.authenticate();
+      logger.info('[db] Sequelize connected');
+
+      return { sequelize, models };
+    } catch (err) {
+      // Reset initPromise so a retry can be attempted by caller
+      initPromise = null;
+      logger.error('[db] initSequelize failed', err);
+      throw err;
     }
-  );
+  })();
 
-  // Define models using the Sequelize instance
-  models = defineModels(sequelize);
-
-  // Test database connection
-  await sequelize.authenticate();
-  logger.info('[db] Sequelize connected');
-
-  return { sequelize, models };
+  return initPromise;
 }
 
 /**
- * Returns the Sequelize instance.
- * @returns {Sequelize}
+ * Returns the Sequelize instance (or null if not initialized).
  */
 function getSequelize() {
   return sequelize;
@@ -50,16 +60,40 @@ function getSequelize() {
 
 /**
  * Returns the defined models.
- * @returns {Object}
+ * - If models are not yet defined but sequelize exists, define them lazily.
+ * - If neither is initialized, throws a descriptive error.
  */
 function getModels() {
-  return models;
+  if (models && Object.keys(models).length > 0) {
+    return models;
+  }
+
+  // If sequelize exists but models not defined (rare), define lazily
+  if (sequelize) {
+    models = defineModels(sequelize);
+    return models;
+  }
+
+  throw new Error('Sequelize not initialized. Call and await initSequelize() before using models.');
 }
 
-// Export functions and Sequelize constructor
+/**
+ * Helper to await initialization from other modules.
+ * Example: await ensureInitialized();
+ */
+async function ensureInitialized() {
+  if (initPromise) {
+    await initPromise;
+    return { sequelize, models };
+  }
+  // Not initialized yet — start initialization
+  return await initSequelize();
+}
+
 module.exports = {
   initSequelize,
   getSequelize,
   getModels,
+  ensureInitialized,
   Sequelize
 };
