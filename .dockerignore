@@ -1,0 +1,49 @@
+# Node / NPM
+node_modules
+npm-debug.log
+package-lock.json*
+yarn.lock
+
+# Environment and local configs
+.env
+.env.local
+.env.*.local
+
+# Logs and temp
+*.log
+logs/
+tmp/
+debug.log
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build artifacts
+dist/
+build/
+coverage/
+.nyc_output/
+
+# Test files
+__tests__/
+test/
+*.test.js
+*.spec.js
+
+# Git / CI
+.git
+.gitignore
+.gitattributes
+.github/
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Local data volumes or persistent mounts
+pgdata/
+sql/
+docs/

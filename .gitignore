@@ -1,0 +1,15 @@
+# Node
+node_modules/
+
+# Docker / Postgres
+pgdata/
+.env
+*.log
+
+# Build artifacts
+*.DS_Store
+dist/
+build/
+
+# VSCode
+.vscode/
