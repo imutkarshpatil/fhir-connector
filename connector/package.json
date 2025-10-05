@@ -1,0 +1,27 @@
+{
+  "name": "fhir-connector",
+  "version": "0.2.0",
+  "description": "Health Tables -> FHIR connector worker (modular)",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "NODE_ENV=development nodemon index.js"
+  },
+  "dependencies": {
+    "axios": "^1.4.0",
+    "dotenv": "^16.3.1",
+    "pg": "^8.11.0",
+    "sequelize": "^6.32.1",
+    "pg-hstore": "^2.3.4",
+    "prom-client": "^14.0.1",
+    "express": "^4.18.2",
+    "pino": "^8.12.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
