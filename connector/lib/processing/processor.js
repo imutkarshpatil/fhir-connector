@@ -234,8 +234,8 @@ async function processClaimed() {
   const claimed = await claimOneOutbox();
   if (!claimed) return false;
 
-  const txid = claimed.txid;
-  const patientId = claimed.patient_id;
+  const txid = parseInt(claimed.txid, 10);
+  const patientId = claimed.patient_id !== null ? parseInt(claimed.patient_id, 10) : null;
   const groupRows = await claimGroup(txid, patientId);
   if (!groupRows || groupRows.length === 0) {
     await markRetry(claimed.id, 'Empty group after claim');
